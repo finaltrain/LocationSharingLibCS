@@ -19,6 +19,9 @@ namespace LocationSharingLibCS
 
         static readonly List<GoogleCookie> cookies = new();
 
+        static List<Person> People = new();
+        static Person? AuthenticatedPerson;
+
         /// <summary>
         /// Constructor when using Cookie Data
         /// </summary>
@@ -65,7 +68,7 @@ namespace LocationSharingLibCS
 
             try
             {
-                Initialize();
+                JToken data = GetData();
             }
             catch (HttpRequestException)
             {
@@ -79,10 +82,15 @@ namespace LocationSharingLibCS
         /// Constructor when using Cookie File
         /// </summary>
         /// <param name="cookiesFilePath">Set cookie file path. absolute path or relative path.</param>
+        /// <param name="language">Select language. Default is English. ex) en, ja, zh...</param>
+        /// <param name="countryCode">Select Country Code. Default is USA. ex) us, ja, cn...</param>
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="InvalidDataException">Cookie Data must contain cookies named "__Secure-1PSID" and "__Secure-3PSID"</exception>
-        public LocationSharingLibCS(string cookiesFilePath)
+        public LocationSharingLibCS(string cookiesFilePath, string language = "en", string countryCode = "us")
         {
+            Languages = language;
+            CountryCode = countryCode;
+
             // Retrieve cookies from StreamReader  CookiesData and stick them in List<GoogleCookie> cookies
 
             List<string> cookieEntries = new();
@@ -127,7 +135,7 @@ namespace LocationSharingLibCS
 
             try
             {
-                Initialize();
+                JToken data = GetData();
             }
             catch (HttpRequestException)
             {
@@ -135,40 +143,6 @@ namespace LocationSharingLibCS
                 // It is not a good idea to have connection problems at the time of initialization.
                 throw;
             }
-        }
-
-
-        /// <summary>
-        /// Check for correct access upon instantiation.
-        /// </summary>
-        /// <returns></returns>
-        /// <exception cref="InvalidDataException">Could not read 7th field of data or it seems invalid session.
-        /// it seems that if the 7th field of the data on the response is 'GgA=' then the session is not properly
-        /// authenticated so we use that heuristic for now which is less intrusive than reaching out to the personal
-        /// console of the user to check for a valid session.</exception>
-        static private bool Initialize()
-        {
-            HttpResponseMessage response = GetServerResponse();
-            string json = response.Content.ReadAsStringAsync().Result;
-            // XXX : Countermeasure against Google returning strange Json
-            string matchedJson = Regex.Match(json, @"(?=\[).*(?<=\])").Value;
-            JToken data = ParseLocationData(matchedJson);
-
-            string? authField;
-            try
-            {
-                authField = (string?)data[6];
-            }
-            catch (Exception)
-            {
-                throw new InvalidDataException("Could not read 7th field of data, it seems invalid data");
-            }
-
-            if (authField is null || authField == "GgA=")
-            {
-                throw new InvalidDataException("Does not seem we have a valid session.");
-            }
-            return true;
         }
 
         /// <summary>
@@ -246,99 +220,173 @@ namespace LocationSharingLibCS
             // XXX : Countermeasure against Google returning strange Json
             string matchedJson = Regex.Match(json, @"(?=\[).*(?<=\])").Value;
 
-            return ParseLocationData(matchedJson);
+            JToken data = ParseLocationData(matchedJson);
+
+            string? authField;
+            try
+            {
+                authField = (string?)data[6];
+            }
+            catch (Exception)
+            {
+                throw new InvalidDataException("Could not read 7th field of data, it seems invalid data");
+            }
+
+            if (authField is null || authField == "GgA=")
+            {
+                throw new InvalidDataException("Does not seem we have a valid session.");
+            }
+
+            return data;
         }
 
         /// <summary>
-        /// Retrieves all people that share their location with this account.
+        /// Update all people that share their location with this account.
         /// </summary>
-        /// <param name="arg">nullable. If needs, you can put JToken Data in the argument. BUT 2 or more cause an error.</param>
-        /// <exception cref="ArgumentOutOfRangeException">could not put 2 or more arguments</exception>
-        static private List<Person> GetSharedPeople(params JToken[] arg)
+        /// <returns>if success, return true</returns>
+        static public bool UpdateSharedPeople()
         {
-            JToken data;
-
-            if (arg.Length == 0)
+            List<Person> temp = new();
+            try
             {
-                try
+                JToken data = GetData();
+
+                JToken? sharedPeopleData = data[0];
+
+                if (sharedPeopleData is null) return false;
+
+                foreach (JToken sharedPersonData in sharedPeopleData)
                 {
-                    data = GetData();
+                    temp.Add(new Person(sharedPersonData));
                 }
-                catch (Exception)
-                {
-                    throw;
-                }
-            }
-            else if (arg.Length == 1)
-            {
-                data = arg[0];
-            }
-            else
-            {
-                // NOTE : Maybe we shouldn't catch it.
-                throw new ArgumentOutOfRangeException(nameof(arg));
-            }
 
-            List<Person> people = new();
-            JToken? sharedPeopleData = data[0];
-            if (sharedPeopleData is null) return people; // no data on sharedPeople. FIXME : I think it's incorrect code.
-
-            foreach (JToken sharedPersonData in sharedPeopleData)
-            {
-                people.Add(new Person(sharedPersonData));
             }
-            return people;
+            catch (Exception)
+            {
+                return false;
+            }
+            People = temp;
+            return true;
         }
 
         /// <summary>
-        /// Retrieves the person associated with this account.
+        /// Update all people that share their location with this account.
         /// </summary>
-        /// <param name="arg">nullable. If needs, you can put JToken Data in the argument. BUT 2 or more cause an error.</param>
-        /// <exception cref="ArgumentOutOfRangeException"></exception>
-        static private Person GetAuthenticatedPerson(params JToken[] arg)
+        /// <returns>if success, return true</returns>
+        static public bool UpdateSharedPeople(JToken arg)
         {
-            JToken data;
-
-            if (arg.Length == 0)
+            List<Person> temp = new();
+            try
             {
-                try
+                JToken data = arg[0] ?? string.Empty;
+
+                JToken? sharedPeopleData = data[0];
+                if (sharedPeopleData is null) return false;
+
+                foreach (JToken sharedPersonData in sharedPeopleData)
                 {
-                    data = GetData();
-                }
-                catch (Exception)
-                {
-                    throw;
+                    temp.Add(new Person(sharedPersonData));
                 }
             }
-            else if (arg.Length == 1)
+            catch (Exception)
             {
-                data = arg[0];
+                return false;
             }
-            else
-            {
-                // NOTE : Maybe we shouldn't catch it.
-                throw new ArgumentOutOfRangeException(nameof(arg));
-            }
-
-            // NOTE : I don't know which is faster, casting to JArray and using Count or using LINQ's Count.
-            JToken authenticatedPersonData = data[9] ?? string.Empty;
-
-            return new Person(authenticatedPersonData);
+            People = temp;
+            return true;
         }
 
         /// <summary>
-        /// Retrieves all people sharing their location.
+        /// Return all people that share their location with this account.
+        /// </summary>
+        static public List<Person> GetSharedPeople()
+        {
+            return People;
+        }
+
+        /// <summary>
+        /// Update the person associated with this account.
+        /// </summary>
+        /// <returns>if success, return true</returns>
+        static public bool UpdateAuthenticatedPerson()
+        {
+            try
+            {
+                JToken data = GetData();
+
+                // NOTE : I don't know which is faster, casting to JArray and using Count or using LINQ's Count.
+                if (((JArray)data).Count < 10) return false;
+                JToken authenticatedPersonData = data[9] ?? string.Empty;
+                AuthenticatedPerson = new Person(authenticatedPersonData);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Update the person associated with this account.
+        /// </summary>
+        /// <returns>if success, return true</returns>
+        static public bool UpdateAuthenticatedPerson(JToken arg)
+        {
+            try
+            {
+                JToken data = arg[0] ?? string.Empty;
+
+                // NOTE : I don't know which is faster, casting to JArray and using Count or using LINQ's Count.
+                if (((JArray)data).Count < 10) return false;
+                JToken authenticatedPersonData = data[9] ?? string.Empty;
+                AuthenticatedPerson = new Person(authenticatedPersonData);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Return the person associated with this account.
+        /// </summary>
+        /// <return>Returns null if the value has never been retrieved</return>
+        static public Person? GetAuthenticatedPerson()
+        {
+            return AuthenticatedPerson;
+        }
+
+        /// <summary>
+        /// Update all people sharing their location.
+        /// </summary>
+        /// <returns>if success, return true</returns>
+        static public bool UpdateAllPeople()
+        {
+            try
+            {
+                JToken data = GetData();
+                UpdateAuthenticatedPerson(data);
+                UpdateSharedPeople(data);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Return all people sharing their location.
         /// </summary>
         static public List<Person> GetAllPeople()
         {
-            JToken data = GetData();
-
-            List<Person> people = new();
-            Person person = GetAuthenticatedPerson(data);
-            people.Add(person);
-            List<Person> sharedPeople = GetSharedPeople(data);
-            people.AddRange(sharedPeople);
-            return people;
+            List<Person> ret = new();
+            if (AuthenticatedPerson is not null) ret.Add(AuthenticatedPerson);
+            ret.AddRange(People);
+            return ret;
         }
 
         /// <summary>
@@ -347,7 +395,7 @@ namespace LocationSharingLibCS
         /// <exception cref="ArgumentException">Nickname not found</exception>
         static public Person GetPersonByNickName(string nickname)
         {
-            foreach (var person in GetSharedPeople())
+            foreach (var person in People)
             {
                 if (person.NickName == nickname) return person;
             }
@@ -360,7 +408,7 @@ namespace LocationSharingLibCS
         /// <exception cref="ArgumentException">Fullname not found</exception>
         static public Person GetPersonByFullName(string fullname)
         {
-            foreach (var person in GetSharedPeople())
+            foreach (var person in People)
             {
                 if (person.FullName == fullname) return person;
             }
@@ -390,8 +438,8 @@ namespace LocationSharingLibCS
         /// </summary>
         static public (string?, string?) GetCoordinatesOfAuthenticatedPerson()
         {
-            Person person = GetAuthenticatedPerson();
-            return (person.Latitude, person.Longitude);
+            if (AuthenticatedPerson is null) return (null, null);
+            return (AuthenticatedPerson.Latitude, AuthenticatedPerson.Longitude);
         }
 
         /// <summary>
@@ -417,8 +465,8 @@ namespace LocationSharingLibCS
         /// </summary>
         static public string? GetLatitudeOfAuthenticatedPerson()
         {
-            Person person = GetAuthenticatedPerson();
-            return person.Latitude;
+            if (AuthenticatedPerson is null) return null;
+            return AuthenticatedPerson.Latitude;
         }
 
         /// <summary>
@@ -444,8 +492,8 @@ namespace LocationSharingLibCS
         /// </summary>
         static public string? GetLongitudeOfAuthenticatedPerson()
         {
-            Person person = GetAuthenticatedPerson();
-            return person.Longitude;
+            if (AuthenticatedPerson is null) return null;
+            return AuthenticatedPerson.Longitude;
         }
 
         /// <summary>
@@ -473,8 +521,8 @@ namespace LocationSharingLibCS
         /// <exception cref="NullReferenceException"></exception>
         static public DateTime? GetTimestampOfAuthenticatedPerson()
         {
-            Person person = GetAuthenticatedPerson();
-            return person.Timestamp;
+            if (AuthenticatedPerson is null) return null;
+            return AuthenticatedPerson.Timestamp;
         }
     }
 }
