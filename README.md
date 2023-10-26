@@ -2,7 +2,7 @@
 LocationSharingLibCS is a C# wrapper for LocationSharingLib coded by python.
 
 # Author
-finaltrain(旅するデジニンジャ)
+finaltrain(譌�縺吶ｋ繝�繧ｸ繝九Φ繧ｸ繝｣)
 * X:https://x.com/final_train
 
 # Licence
