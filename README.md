@@ -5,6 +5,8 @@ It was intended to be a wrapper, but it has been modified so much that it is no 
 # Usage
 *You need to prepare the cookie file in the same way as the original locationsharinglib in advance.*
 
+First, you need to install package Newtonsoft.Json.
+
 In the constructor of LocationSharingLibCS, pass the path to the cookie file (absolute or relative path) as string or the contents of the cookie file as StreamReader.
 At the same time, language and countryCode can be specified to set the language and region. If not specified, English and U.S. will be used.
 
