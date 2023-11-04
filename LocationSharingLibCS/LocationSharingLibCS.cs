@@ -11,7 +11,7 @@ namespace LocationSharingLibCS
     /// <summary>
     /// A library to retrieve coordinates from an google account that has been shared locations of other accounts.
     /// </summary>
-    public class LocationSharingLibCS
+    public class LocationSharing
     {
         readonly static string[] VALID_COOKIE_NAMES = new string[] { "__Secure-1PSID", "__Secure-3PSID" };
         static string Languages = "en";
@@ -29,7 +29,7 @@ namespace LocationSharingLibCS
         /// <param name="language">Select language. Default is English. ex) en, ja, zh...</param>
         /// <param name="countryCode">Select Country Code. Default is USA. ex) us, ja, cn...</param>
         /// <exception cref="InvalidDataException">Cookie Data must contain cookies named "__Secure-1PSID" and "__Secure-3PSID"</exception>
-        public LocationSharingLibCS(StreamReader cookiesData, string language = "en", string countryCode = "us")
+        public LocationSharing(StreamReader cookiesData, string language = "en", string countryCode = "us")
         {
             Languages = language;
             CountryCode = countryCode;
@@ -86,7 +86,7 @@ namespace LocationSharingLibCS
         /// <param name="countryCode">Select Country Code. Default is USA. ex) us, ja, cn...</param>
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="InvalidDataException">Cookie Data must contain cookies named "__Secure-1PSID" and "__Secure-3PSID"</exception>
-        public LocationSharingLibCS(string cookiesFilePath, string language = "en", string countryCode = "us")
+        public LocationSharing(string cookiesFilePath, string language = "en", string countryCode = "us")
         {
             Languages = language;
             CountryCode = countryCode;
